@@ -13,7 +13,7 @@ afterAll(async () => {
 });
 
 test("sanity", () => {
-  expect(true).toBe(false);
+  expect(true).toBe(true);
 });
 
 describe("auth router tests", () => {
