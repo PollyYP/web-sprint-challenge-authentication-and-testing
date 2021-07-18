@@ -1,7 +1,11 @@
-const router = require('express').Router();
+const router = require("express").Router();
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const Users = require("./auth-model");
+const { JWT_SECRET } = require("../secrets/secret");
 
-router.post('/register', (req, res) => {
-  res.end('implement register, please!');
+router.post("/register", async (req, res, next) => {
+  //res.end('implement register, please!');
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
@@ -27,10 +31,36 @@ router.post('/register', (req, res) => {
     4- On FAILED registration due to the `username` being taken,
       the response body should include a string exactly as follows: "username taken".
   */
+  try {
+    const { username, password } = req.body;
+    const user = await Users.findByUsername(username);
+
+    if (!username || !password) {
+      return res.status(400).json({
+        message: "username and password required",
+      });
+    } else if (user) {
+      return res.status(409).json({
+        message: "username taken",
+      });
+    }
+
+    const newUser = await Users.add({
+      username,
+      password: await bcrypt.hash(
+        password,
+        parseInt(process.env.BCRYPT_TIME_COMPLEXITY)
+      ),
+    });
+
+    res.status(201).json(newUser);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.post('/login', (req, res) => {
-  res.end('implement login, please!');
+router.post("/login", async (req, res, next) => {
+  //res.end('implement login, please!');
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
@@ -54,6 +84,43 @@ router.post('/login', (req, res) => {
     4- On FAILED login due to `username` not existing in the db, or `password` being incorrect,
       the response body should include a string exactly as follows: "invalid credentials".
   */
+  try {
+    const { username, password } = req.body;
+    const user = await Users.findByUsername(username);
+
+    if (!username || !password) {
+      return res
+        .status(400)
+        .json({ message: "username and password required" });
+    } else if (!user) {
+      return res.status(401).json({
+        message: "invalid credentials",
+      });
+    }
+
+    const passwordValid = await bcrypt.compare(password, user.password);
+
+    if (!passwordValid) {
+      return res.status(401).json({
+        message: "invalid credentials",
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        userID: user.id,
+      },
+      JWT_SECRET
+    );
+
+    res.cookie("token", token);
+    res.json({
+      message: `Welcome, ${user.username}`,
+      token: token,
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;
